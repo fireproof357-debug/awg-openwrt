@@ -33,7 +33,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y coreutils
-
+          echo "=== INSTALL DIAGNOSTICS ==="
+          command -v install
+          install --version
+          /usr/bin/install --version
+          echo "=== PATH ==="
+          echo "$PATH"
       - uses: actions/checkout@v4
         with:
           repository: openwrt/openwrt
