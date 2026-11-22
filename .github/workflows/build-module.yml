@@ -31,14 +31,11 @@ jobs:
     steps:
       - name: Install build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y coreutils
-          echo "=== FIX GNU INSTALL ==="
+         sudo apt-get update
+          sudo apt-get install -y wget xz-utils
           mkdir -p "$HOME/gnu-bin"
-          cp /bin/busybox "$HOME/gnu-bin/busybox" 2>/dev/null || true
-          sudo apt-get download coreutils
-          mkdir -p /tmp/gnu-coreutils
-          dpkg-deb -x coreutils_*.deb /tmp/gnu-coreutils
+          wget -q https://ftp.debian.org/debian/pool/main/c/coreutils/coreutils_9.1-1_amd64.deb -O /tmp/coreutils.deb
+          dpkg-deb -x /tmp/coreutils.deb /tmp/gnu-coreutils
           cp /tmp/gnu-coreutils/usr/bin/install "$HOME/gnu-bin/install"
           chmod +x "$HOME/gnu-bin/install"
           echo "$HOME/gnu-bin" >> "$GITHUB_PATH"
