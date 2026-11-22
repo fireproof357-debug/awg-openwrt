@@ -29,6 +29,11 @@ jobs:
             vermagic: "9c242f353867f49a96054ff8c9f2c460"
 
     steps:
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y coreutils
+
       - uses: actions/checkout@v4
         with:
           repository: openwrt/openwrt
