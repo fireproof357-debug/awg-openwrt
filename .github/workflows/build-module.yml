@@ -33,12 +33,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y coreutils
-          echo "=== INSTALL DIAGNOSTICS ==="
-          command -v install
-          install --version
-          /usr/bin/install --version
-          echo "=== PATH ==="
-          echo "$PATH"
+          echo "=== FIX GNU INSTALL ==="
+          mkdir -p "$HOME/gnu-bin"
+          cp /bin/busybox "$HOME/gnu-bin/busybox" 2>/dev/null || true
+          sudo apt-get download coreutils
+          mkdir -p /tmp/gnu-coreutils
+          dpkg-deb -x coreutils_*.deb /tmp/gnu-coreutils
+          cp /tmp/gnu-coreutils/usr/bin/install "$HOME/gnu-bin/install"
+          chmod +x "$HOME/gnu-bin/install"
+          echo "$HOME/gnu-bin" >> "$GITHUB_PATH"
+          "$HOME/gnu-bin/install" --version
       - uses: actions/checkout@v4
         with:
           repository: openwrt/openwrt
