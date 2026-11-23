@@ -1,0 +1,118 @@
+
+name: Build AmneziaWG for Keenetic Lite III
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/hostedtoolcache
+          df -h
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential clang flex bison g++ gawk \
+            gcc-multilib gettext git libncurses-dev \
+            libssl-dev python3 python3-setuptools \
+            rsync unzip wget file zlib1g-dev \
+            libelf-dev
+
+      - name: Checkout OpenWrt 23.05.2
+        uses: actions/checkout@v4
+        with:
+          repository: openwrt/openwrt
+          ref: v23.05.2
+          fetch-depth: 1
+
+      - name: Configure feeds
+        run: |
+          wget -q \
+            https://downloads.openwrt.org/releases/23.05.2/targets/ramips/mt76x8/feeds.buildinfo \
+            -O feeds.conf
+
+          echo "src-git awgopenwrt https://github.com/yury-sannikov/awg-openwrt.git;master" >> feeds.conf
+
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Configure build
+        run: |
+          wget -q \
+            https://downloads.openwrt.org/releases/23.05.2/targets/ramips/mt76x8/config.buildinfo \
+            -O .config
+
+          cat >> .config <<'EOF'
+          CONFIG_PACKAGE_kmod-amneziawg=m
+          CONFIG_PACKAGE_amneziawg-tools=m
+          CONFIG_PACKAGE_luci-app-amneziawg=m
+          EOF
+
+          make defconfig
+
+      - name: Build tools
+        run: |
+          make tools/install -j2 V=s
+
+      - name: Build toolchain
+        run: |
+          make toolchain/install -j2 V=s
+
+      - name: Build kernel
+        run: |
+          make target/linux/compile -j2 V=s
+
+      - name: Check kernel vermagic
+        run: |
+          ACTUAL=$(find build_dir/target-* \
+            -path '*/linux-*/linux-*/.vermagic' \
+            -type f -print -quit)
+
+          test -n "$ACTUAL"
+
+          VALUE=$(cat "$ACTUAL")
+          EXPECTED="22adb8990ec6e873c5e479f81e332465"
+
+          echo "Actual: $VALUE"
+          echo "Expected: $EXPECTED"
+
+          test "$VALUE" = "$EXPECTED"
+
+      - name: Build AmneziaWG packages
+        run: |
+          make package/kmod-amneziawg/compile -j2 V=s
+          make package/amneziawg-tools/compile -j2 V=s
+          make package/luci-app-amneziawg/compile -j2 V=s
+
+      - name: Collect IPK packages
+        run: |
+          mkdir -p artifacts
+
+          find bin -type f \( \
+            -name 'kmod-amneziawg_*.ipk' -o \
+            -name 'amneziawg-tools_*.ipk' -o \
+            -name 'luci-app-amneziawg_*.ipk' \
+          \) -exec cp -v {} artifacts/ \;
+
+          ls -lh artifacts/
+
+          test "$(find artifacts -name '*.ipk' | wc -l)" -eq 3
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: amneziawg-openwrt-23.05.2-mt76x8
+          path: artifacts/*.ipk
+          if-no-files-found: error
+          retention-days: 30
